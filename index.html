@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motive Analytics Pro</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.1.0"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- Firebase loaded via ES Modules inside script.js -->
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════
+       AUTH SCREEN
+  ═══════════════════════════════════════════════════════ -->
+  <div id="auth-screen-wrapper" class="container-auth">
+    <div class="auth-side">
+      <div class="auth-card">
+        <h2 id="page-title">Login to your account</h2>
+        <p id="page-subtitle">
+          Don't have an account?
+          <button class="toggle-btn" onclick="toggleAuthState()">Sign up</button>
+        </p>
+        <div id="alert-box" class="alert"></div>
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+          <div class="form-group-auth">
+            <label for="email">Enter Work Email</label>
+            <input type="email" id="email" placeholder="me@gomotive.com" required>
+          </div>
+          <div class="form-group-auth">
+            <label for="password">Enter Password</label>
+            <input type="password" id="password" placeholder="••••••••••••" required>
+          </div>
+          <button type="submit" class="submit-btn">
+            <span id="btn-text">LOG IN</span>
+            <svg viewBox="0 0 24 24"><path d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </button>
+        </form>
+        <p class="footer-text">
+          By logging in, you agree to the
+          <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+        </p>
+      </div>
+    </div>
+    <div class="image-side"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MAIN DASHBOARD
+  ═══════════════════════════════════════════════════════ -->
+  <div id="main-dashboard-app" class="app-container" style="display:none;">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+      <div class="logo">
+        <img class="logo-img" src="" alt="logo" style="display:none;">
+        <span class="logo-text">MOTIVE <span>ANALYTICS</span></span>
+      </div>
+
+      <!-- Firebase sync status pill -->
+      <div id="fb-status-pill" class="offline">💾 Local Mode</div>
+
+      <ul class="nav-links">
+        <li id="nav-stats"       class="active"         onclick="showPage('stats-view')">📊 Performance Dashboard</li>
+        <li id="nav-qa-data"                            onclick="showPage('qa-data-view')">🔍 QA Data Analysis</li>
+        <li id="nav-leaderboard"                        onclick="showPage('leaderboard-view')">🏆 Leaderboard</li>
+        <li id="nav-manage"                             onclick="showPage('manage-members')">🗂 Manage Members</li>
+        <li id="nav-import"                             onclick="showPage('import-page')">📤 Upload &amp; Sync Data</li>
+        <!-- Admin-only item — hidden until admin logs in -->
+        <li id="nav-admin" class="admin-badge-nav"
+            style="display:none;"
+            onclick="openAdminSettings()">⚙️ Admin Settings</li>
+        <li id="nav-logout" class="logout-link-clean"   onclick="executeSessionLogout()">🚪 Account Logout</li>
+      </ul>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="content">
+
+      <!-- ───────────────────────────────────────────────
+           PAGE 1 · PERFORMANCE DASHBOARD
+      ─────────────────────────────────────────────── -->
+      <section id="stats-view" class="page">
+        <div class="page-header-sticky">
+          <div class="header-left">
+            <div class="icon-frame-bg">👥</div>
+            <div>
+              <h1>Performance Dashboard</h1>
+              <p>Team productivity metrics and analytics</p>
+            </div>
+          </div>
+          <div class="filter-row-elite">
+            <div class="select-group-elite">
+              <label>Select POD</label>
+              <select id="podSelector" onchange="filterUsersByPod('userSelector')"></select>
+            </div>
+            <div class="select-group-elite">
+              <label>Select Person</label>
+              <select id="userSelector"></select>
+            </div>
+            <div class="select-group-elite">
+              <label>From Week</label>
+              <select id="timeFilterFrom" onchange="validateDashboardRange('from')"></select>
+            </div>
+            <div class="select-group-elite">
+              <label>To Week</label>
+              <select id="timeFilterTo" onchange="validateDashboardRange('to')"></select>
+            </div>
+            <button onclick="initDashboard()" class="toggle-view-btn"
+              style="background:var(--primary);color:white;border:none;font-weight:bold;">
+              🔍 Load Dashboard
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="image-metric-cards-row">
+          <div class="img-kpi-card">
+            <div class="card-head-flex"><span>Avg Target Achievement</span><div class="icon-dot blue-glow">🎯</div></div>
+            <h1 id="img-ach-val">0%</h1>
+          </div>
+          <div class="img-kpi-card">
+            <div class="card-head-flex"><span>Avg Expected vs Actual</span><div class="icon-dot green-glow">📈</div></div>
+            <h1 id="img-exp-val">0%</h1>
+          </div>
+          <div class="img-kpi-card">
+            <div class="card-head-flex"><span>Total Lost Minutes</span><div class="icon-dot red-glow">⏳</div></div>
+            <h1 id="img-lost-val">0</h1>
+          </div>
+          <div class="img-kpi-card">
+            <div class="card-head-flex"><span>Punctuality Rate</span><div class="icon-dot yellow-glow">⏱️</div></div>
+            <h1 id="img-punc-val">0%</h1>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-dock-split">
+          <div class="chart-box-card">
+            <div class="chart-head-details">
+              <h3>Target Achievement %</h3>
+              <p>Performance against set targets</p>
+            </div>
+            <div class="canvas-box-frame"><canvas id="targetAchievementBarCanvas"></canvas></div>
+          </div>
+          <div class="chart-box-card">
+            <div class="chart-head-details">
+              <h3>Expected vs Actual Comparison</h3>
+              <p>Performance metrics trend analysis</p>
+            </div>
+            <div class="canvas-box-frame"><canvas id="expectedVsActualLineCanvas"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Table + Pie -->
+        <div class="details-dock-split">
+          <div class="table-box-card-wrapper">
+            <div class="chart-head-details"><h3>Team Performance Details</h3><p>Detailed metrics for all team members</p></div>
+            <div class="table-scroll-frame" id="teamPerformanceDetailsGrid"></div>
+          </div>
+          <div class="chart-box-card pie-container-card">
+            <div class="chart-head-details"><h3>Performance Distribution</h3><p>Team performance breakdown</p></div>
+            <div class="pie-chart-frame-box"><canvas id="performancePieDistributionCanvas"></canvas></div>
+            <div class="pie-legends-custom-grid">
+              <div class="legend-p-item"><span class="dot-l l-exceed"></span> Exceeding (≥110%)</div>
+              <div class="legend-p-item"><span class="dot-l l-meet"></span> Meeting (100–110%)</div>
+              <div class="legend-p-item"><span class="dot-l l-approach"></span> Approaching (90–100%)</div>
+              <div class="legend-p-item"><span class="dot-l l-improve"></span> Needs Improvement (&lt;90%)</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────────────────────────────
+           PAGE 2 · QA DATA ANALYSIS
+      ─────────────────────────────────────────────── -->
+      <section id="qa-data-view" class="page hidden">
+        <div class="page-header-sticky">
+          <div class="header-left">
+            <div class="icon-frame-bg">🔍</div>
+            <div><h1>QA Data Analysis</h1><p>Automated team productivity metrics from Excel sheet</p></div>
+          </div>
+          <div class="filter-row-elite">
+            <div class="select-group-elite">
+              <label>Select POD</label>
+              <select id="qaPodSelector" onchange="filterUsersByPod('qaPersonSelect')"></select>
+            </div>
+            <div class="select-group-elite">
+              <label>Select Person</label>
+              <select id="qaPersonSelect"></select>
+            </div>
+            <div class="select-group-elite">
+              <label>From Week</label>
+              <select id="qaTimeFilterFrom" onchange="validateQaRange('from')"></select>
+            </div>
+            <div class="select-group-elite">
+              <label>To Week</label>
+              <select id="qaTimeFilterTo" onchange="validateQaRange('to')"></select>
+            </div>
+            <button onclick="triggerQaSearchRequest()" class="toggle-view-btn"
+              style="background:var(--success);color:white;border:none;font-weight:bold;height:38px;">
+              🚀 Load Insights
+            </button>
+          </div>
+        </div>
+
+        <div class="image-metric-cards-row">
+          <div class="img-kpi-card">
+            <div class="card-head-flex"><span>Total QA Tags</span><div class="icon-dot blue-glow">📊</div></div>
+            <h1 id="c-total">0</h1>
+          </div>
+          <div class="img-kpi-card">
+            <div class="card-head-flex"><span>Valid Crash Tags</span><div class="icon-dot red-glow">💥</div></div>
+            <h1 id="c-valid" style="color:var(--danger);">0</h1>
+          </div>
+          <div class="img-kpi-card">
+            <div class="card-head-flex"><span>Non Valid Crash Tags</span><div class="icon-dot yellow-glow">🛡</div></div>
+            <h1 id="c-nonvalid" style="color:var(--warning);">0</h1>
+          </div>
+          <div class="img-kpi-card">
+            <div class="card-head-flex"><span>Others Tags</span><div class="icon-dot blue-glow">🔗</div></div>
+            <h1 id="c-others" style="color:var(--primary);">0</h1>
+          </div>
+        </div>
+
+        <div class="charts-dock-split">
+          <div class="chart-box-card">
+            <div class="chart-head-details"><h3>QA Tags Category</h3><p>Violation types breakdown</p></div>
+            <div class="canvas-box-frame"><canvas id="qaBarChart"></canvas></div>
+          </div>
+          <div class="chart-box-card">
+            <div class="chart-head-details"><h3>Expected vs Actual Comparison</h3><p>Performance trend analysis</p></div>
+            <div class="canvas-box-frame"><canvas id="qaLineChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="details-dock-split">
+          <div class="table-box-card-wrapper">
+            <div class="chart-head-details"><h3>Team QA Data</h3><p>Metrics from master Excel logs</p></div>
+            <div class="table-scroll-frame">
+              <table class="premium-dark-table">
+                <thead>
+                  <tr>
+                    <th>Member Name</th><th>Timeline Week</th><th>Valid Crash</th>
+                    <th>Non-Valid Crash</th><th>Other Tag</th><th>Tickets</th>
+                    <th>Make Ticket</th><th>Score Update</th>
+                  </tr>
+                </thead>
+                <tbody id="qaTableBody">
+                  <tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text-secondary);">
+                    Select filters and click Load Insights.
+                  </td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="chart-box-card pie-container-card" style="gap:15px;">
+            <div class="chart-head-details"><h3>Status Distribution</h3><p>QA Status share</p></div>
+            <div class="pie-chart-frame-box"><canvas id="qaPieChart"></canvas></div>
+            <div class="pie-legends-custom-grid" style="margin-bottom:10px;">
+              <div class="legend-p-item"><span class="dot-l l-exceed"></span> Agree (<span id="p-agree">0%</span>)</div>
+              <div class="legend-p-item"><span class="dot-l l-improve"></span> Disagree (<span id="p-disagree">0%</span>)</div>
+              <div class="legend-p-item"><span class="dot-l l-meet"></span> No Access (<span id="p-noaccess">0%</span>)</div>
+              <div class="legend-p-item"><span class="dot-l l-approach"></span> Doubtful (<span id="p-doubtful">0%</span>)</div>
+            </div>
+            <hr style="width:100%;border:0;border-top:1px solid var(--border-dim);margin:5px 0;">
+            <div class="chart-head-details"><h3>QA Factor Breakdown</h3><p>Verification audit mapping</p></div>
+            <div class="pie-chart-frame-box"><canvas id="qaFactorPieChart"></canvas></div>
+            <div class="pie-legends-custom-grid">
+              <div class="legend-p-item"><span class="dot-l l-meet"></span> Inattentiveness (<span id="p-inattentive">0%</span>)</div>
+              <div class="legend-p-item"><span class="dot-l l-approach"></span> Conceptual Issues (<span id="p-conceptual">0%</span>)</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────────────────────────────
+           PAGE 3 · LEADERBOARD
+      ─────────────────────────────────────────────── -->
+      <section id="leaderboard-view" class="page hidden">
+        <div class="page-header-sticky">
+          <div class="header-left">
+            <div class="icon-frame-bg">🏆</div>
+            <div><h1>Leaderboard &amp; Rankings</h1><p>Top performance tracks, weekly evaluations</p></div>
+          </div>
+          <div class="filter-row-elite">
+            <div class="select-group-elite">
+              <label>Select POD</label>
+              <select id="resultPodSelector" onchange="updateResultTimeline()"></select>
+            </div>
+            <div class="select-group-elite">
+              <label>From Week</label>
+              <select id="resultTimeSelectorFrom" onchange="validateLeaderboardRange('from')"></select>
+            </div>
+            <div class="select-group-elite">
+              <label>To Week</label>
+              <select id="resultTimeSelectorTo" onchange="validateLeaderboardRange('to')"></select>
+            </div>
+            <button onclick="calculateResults()" class="toggle-view-btn"
+              style="background:var(--primary);color:white;border:none;font-weight:bold;">
+              Check Rankings
+            </button>
+          </div>
+        </div>
+
+        <div id="resultsContent" style="display:none;margin-top:10px;">
+          <div class="celebration-container">
+            <div class="card highlight">
+              <div class="card-header"><div class="badge">Overall Champions</div></div>
+              <ul class="leaderboard-list" id="overallChampions"></ul>
+            </div>
+            <div class="card gold-border">
+              <div class="card-header"><div class="badge gray">Top VA Volume</div></div>
+              <ul class="leaderboard-list" id="topVA"></ul>
+            </div>
+            <div class="card silver-border">
+              <div class="card-header"><div class="badge gray">Top QA Score</div></div>
+              <ul class="leaderboard-list" id="topQA"></ul>
+            </div>
+          </div>
+
+          <div class="img-kpi-card" style="margin-bottom:25px;flex-direction:row;align-items:center;justify-content:space-between;">
+            <div>
+              <span style="font-size:12px;color:var(--text-secondary);font-weight:700;text-transform:uppercase;">📈 Performance Strategy Matrix</span>
+              <h2 id="mostImproved" style="margin:5px 0 0 0;font-size:15px;color:var(--success);">N/A</h2>
+            </div>
+            <div class="icon-dot green-glow" style="width:45px;height:45px;font-size:20px;">🚀</div>
+          </div>
+
+          <div class="table-box-card-wrapper">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <div class="chart-head-details">
+                <h3 id="resultListTitle">Performance Insights</h3>
+                <p>Categorized assessment indicators</p>
+              </div>
+              <div class="tab-filters">
+                <button onclick="filterResultTable('improved')"  class="tab-btn">✅ Improved</button>
+                <button onclick="filterResultTable('declined')"  class="tab-btn">🔻 Declined</button>
+                <button onclick="filterResultTable('below')"     class="tab-btn active">⚠️ Below Benchmark</button>
+              </div>
+            </div>
+            <div class="table-scroll-frame">
+              <table class="premium-dark-table">
+                <thead><tr><th>Name</th><th>VA %</th><th>QA %</th><th>Weekly Status</th></tr></thead>
+                <tbody id="underPerformersBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SLACK SEND SECTION -->
+        <div id="slackSendSection" style="display:none;margin-top:30px;padding:20px;background:#111122;border-radius:12px;border:1px solid var(--border-dim);">
+          <h3 style="margin-top:0;font-size:16px;font-weight:700;">📤 Send Results to Slack</h3>
+          <div style="display:flex;gap:15px;margin-bottom:15px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="radio" name="slackSendOption" value="top" checked>
+              <span style="font-size:13px;">⭐ Top Performers Only</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="radio" name="slackSendOption" value="low">
+              <span style="font-size:13px;">⚠️ Low Performers Only</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="radio" name="slackSendOption" value="both">
+              <span style="font-size:13px;">🔄 Send Both</span>
+            </label>
+          </div>
+          <div style="display:flex;gap:12px;margin-bottom:15px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;margin-bottom:6px;">Send Timing</label>
+              <select id="slackSendTiming" style="width:100%;padding:10px 14px;background:#0a0a14;border:1px solid var(--border-dim);border-radius:8px;color:#fff;font-size:13px;">
+                <option value="now">🚀 Send Now</option>
+                <option value="30min">⏰ In 30 minutes</option>
+                <option value="1hour">⏰ In 1 hour</option>
+                <option value="custom">⏰ Custom time</option>
+              </select>
+            </div>
+            <div id="customTimeBox" style="flex:1;min-width:200px;display:none;">
+              <label style="display:block;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;margin-bottom:6px;">Select Time</label>
+              <input type="datetime-local" id="customSendTime" style="width:100%;padding:10px 14px;background:#0a0a14;border:1px solid var(--border-dim);border-radius:8px;color:#fff;font-size:13px;">
+            </div>
+          </div>
+          <button onclick="prepareSlackMessage()"
+            style="width:100%;background:#3b82f6;color:white;padding:14px;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-size:14px;">
+            📤 Send to Slack
+          </button>
+          <div id="slackSendStatus" style="margin-top:12px;display:none;"></div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────────────────────────────
+           PAGE 4 · MANAGE MEMBERS
+      ─────────────────────────────────────────────── -->
+      <section id="manage-members" class="page hidden">
+        <h1>Member Management</h1>
+        <div style="margin-bottom:15px;display:flex;gap:10px;align-items:center;">
+          <input type="text" id="memberSearchInput" placeholder="🔍 Search member..."
+            onkeyup="renderMemberTable()"
+            style="width:250px;padding:10px;background:#111122;border:1px solid var(--border-dim);color:#fff;border-radius:8px;">
+          <select id="memberPodFilter" onchange="renderMemberTable()"
+            style="padding:10px 14px;background:#111122;border:1px solid var(--border-dim);color:#fff;border-radius:8px;min-width:150px;"></select>
+        </div>
+        <div class="table-scroll-frame">
+          <table class="premium-dark-table">
+            <thead><tr><th>Name</th><th>Level</th><th>Target %</th><th>POD</th><th>Action</th></tr></thead>
+            <tbody id="memberTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ───────────────────────────────────────────────
+           PAGE 5 · UPLOAD & SYNC DATA
+      ─────────────────────────────────────────────── -->
+      <section id="import-page" class="page hidden">
+        <div class="upload-card">
+          <h2>Data Management Center</h2>
+          <div style="text-align:left;background:#07070d;padding:25px;border-radius:12px;border:1px solid var(--border-dim);display:flex;flex-direction:column;gap:15px;">
+
+            <div style="display:flex;gap:10px;width:100%;">
+              <div class="select-group-elite" style="flex:1;">
+                <label>Select POD</label>
+                <select id="assignPod" style="width:100%;min-width:unset;"></select>
+              </div>
+              <div class="select-group-elite" style="flex:1;">
+                <label>Create New POD</label>
+                <div style="display:flex;gap:5px;">
+                  <input type="text" id="newPodName" placeholder="New POD name" style="width:100%;min-width:unset;">
+                  <button onclick="createNewPod()"
+                    style="background:var(--success);color:white;padding:0 12px;border-radius:8px;border:none;cursor:pointer;font-weight:bold;">
+                    Add
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="select-group-elite">
+              <label>Select Sheet Type</label>
+              <select id="sheetTypeSelect" style="width:100%;">
+                <option value="performance">📊 Performance Sheet</option>
+                <option value="qa">🔍 QA Sheet</option>
+              </select>
+            </div>
+
+            <div class="select-group-elite">
+              <label>Master Sheet URL <span style="color:#64748b;font-weight:400;">(Google Sheet published link)</span></label>
+              <input type="text" id="masterSheetLinkInput"
+                placeholder="https://docs.google.com/spreadsheets/d/...export?format=xlsx"
+                style="width:100%;">
+            </div>
+
+            <div class="select-group-elite">
+              <label>Upload File <span style="color:#64748b;font-weight:400;">(.xlsx / .xls / .csv)</span></label>
+              <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="width:100%;color:var(--text-secondary);">
+            </div>
+
+            <button onclick="handleMasterSheetSaving()"
+              style="width:100%;background:#10b981;color:white;padding:14px;font-weight:700;border-radius:8px;border:none;cursor:pointer;font-size:14px;margin-top:5px;">
+              ☁️ Upload &amp; Sync to Cloud
+            </button>
+          </div>
+
+          <!-- SLACK INTEGRATION SETUP -->
+          <div style="margin-top:30px;padding:20px;background:#111122;border-radius:12px;border:1px solid var(--border-dim);">
+            <h3 style="margin-top:0;font-size:16px;font-weight:700;">📱 Slack Integration Setup</h3>
+
+            <!-- Tab buttons -->
+            <div style="display:flex;gap:8px;margin-bottom:15px;border-bottom:1px solid var(--border-dim);padding-bottom:12px;">
+              <button class="slack-tab-btn active" onclick="switchSlackTab('webhook')"
+                style="padding:8px 16px;background:transparent;border:2px solid var(--primary);color:var(--primary);border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;">
+                🔗 Webhook URL (Auto)
+              </button>
+              <button class="slack-tab-btn" onclick="switchSlackTab('workspace')"
+                style="padding:8px 16px;background:transparent;border:2px solid var(--border-dim);color:var(--text-secondary);border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;">
+                💼 Workspace Link (Manual)
+              </button>
+            </div>
+
+            <!-- Webhook Tab -->
+            <div id="webhookTab">
+              <div class="select-group-elite">
+                <label>Slack Webhook URL</label>
+                <div style="display:flex;gap:8px;align-items:flex-end;">
+                  <input type="password" id="slackWebhookUrl" placeholder="https://hooks.slack.com/services/..."
+                    style="flex:1;padding:12px;background:#0a0a14;border:1px solid var(--border-dim);border-radius:8px;color:#fff;font-size:13px;">
+                  <button onclick="toggleWebhookVisibility()"
+                    style="background:var(--border-dim);color:var(--text-secondary);padding:12px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:bold;">
+                    👁
+                  </button>
+                  <button onclick="saveSlackWebhook()"
+                    style="background:var(--success);color:white;padding:12px 20px;border-radius:8px;border:none;cursor:pointer;font-weight:bold;">
+                    💾 Save
+                  </button>
+                </div>
+                <p style="font-size:12px;color:var(--text-secondary);margin:8px 0 0 0;">
+                  ℹ️ <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:var(--primary);">How to get Webhook URL →</a>
+                </p>
+              </div>
+              <div id="webhookStatusBox" style="margin-top:12px;display:none;"></div>
+              <div id="webhookConfiguredBox" style="margin-top:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span>✅ Webhook configured!</span>
+                  <button onclick="removeSlackWebhook()"
+                    style="background:var(--danger);color:white;padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-weight:600;font-size:11px;">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Workspace Tab -->
+            <div id="workspaceTab" style="display:none;">
+              <div class="select-group-elite">
+                <label>Slack Workspace Link</label>
+                <div style="display:flex;gap:8px;align-items:flex-end;">
+                  <input type="text" id="slackWorkspaceLink" placeholder="https://app.slack.com/client/..."
+                    style="flex:1;padding:12px;background:#0a0a14;border:1px solid var(--border-dim);border-radius:8px;color:#fff;font-size:13px;">
+                  <button onclick="saveSlackWorkspaceLink()"
+                    style="background:var(--success);color:white;padding:12px 20px;border-radius:8px;border:none;cursor:pointer;font-weight:bold;">
+                    💾 Save
+                  </button>
+                </div>
+              </div>
+              <div id="workspaceStatusBox" style="margin-top:12px;display:none;"></div>
+              <div id="workspaceConfiguredBox" style="margin-top:12px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span>✅ Workspace link saved!</span>
+                  <button onclick="removeSlackWorkspaceLink()"
+                    style="background:var(--danger);color:white;padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-weight:600;font-size:11px;">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="syncAllMembers()"
+            style="width:100%;background:#2563eb;color:white;padding:15px;font-weight:700;border-radius:8px;margin-top:20px;border:none;cursor:pointer;font-size:14px;">
+            🔄 Check Cloud Sync Status
+          </button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Sync Toast -->
+  <div id="sync-toast"></div>
+
+  <!-- Load main script as ES Module -->
+  <script type="module" src="js/script.js"></script>
+
+</body>
+</html>
