@@ -13,12 +13,13 @@
 // ============================================================
 
 export const FIREBASE_CONFIG = {
-  apiKey:            "PASTE_YOUR_API_KEY_HERE",
-  authDomain:        "PASTE_YOUR_PROJECT_ID.firebaseapp.com",
-  projectId:         "PASTE_YOUR_PROJECT_ID",
-  storageBucket:     "PASTE_YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId:             "PASTE_YOUR_APP_ID"
+  apiKey: "AIzaSyCFHJ1JqKMeZZKrBk14NQ56KBuwtllohH8",
+  authDomain: "motive-analytics.firebaseapp.com",
+  projectId: "motive-analytics",
+  storageBucket: "motive-analytics.firebasestorage.app",
+  messagingSenderId: "823396422793",
+  appId: "1:823396422793:web:1c591d9b1acd14d2cda258",
+  measurementId: "G-ZQYBDJ1T0Q"
 };
 
 // ============================================================
