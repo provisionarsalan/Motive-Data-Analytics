@@ -2,7 +2,7 @@
 // 🚀 MOTIVE ANALYTICS PRO — MAIN SCRIPT (Firebase Upgraded)
 // ============================================================
 
-import { FIREBASE_CONFIG } from "../config/firebase-config.js";
+import { FIREBASE_CONFIG } from "firebase-config.js";
 import {
   initFirebase, isOnline, loginAdmin, logoutAdmin, watchAuth,
   getPods, addPod, deletePodFromDB,
